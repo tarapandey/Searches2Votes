@@ -1,113 +1,43 @@
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
+from serpapi import GoogleSearch
+import pandas as pd
+import numpy as np
 
-import time
+params = {
+    "engine": "google_trends",
+    "q": "zombies",
+    "date": "2024-01-01 2024-11-05",
+    "data_type": "GEO_MAP_0",
+    "geo": "US",
+    "api_key": "API-KEY"
+}
 
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
+search = GoogleSearch(params)
+results = search.get_dict()
 
-def get_driver():
-    # update the path to the location of your Chrome binary
-    CHROME_PATH = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+region_data = results.get("interest_by_region", [])
 
-    options = Options()
-    # options.add_argument("--headless=new")
-    options.binary_location = CHROME_PATH
+data = {
+    entry["location"]: entry["value"]
+    for entry in region_data
+}
 
-    driver = webdriver.Chrome(options=options)
+# Create the DataFrame
+df = pd.DataFrame.from_dict(data, orient="index", columns=["zombies"])
+df.index.name = "geoName"
 
-    return driver
+election_data = pd.read_excel('~Downloads/2024presgeresults.xlsx')
+state_codes = pd.read_csv('~Downloads/data-map-state-abbreviations - data-map-state-abbreviations.csv')
+election_data = election_data[:51]
 
+#creating merged_df that includes the vote counts
+merged_df = pd.merge(election_data, state_codes, on='STATE', how='left')
+merged_df = merged_df.fillna(0)
+merged_df = pd.merge(merged_df, df, on='geoName', how='left')
 
-def get_all_pages_html(driver):
+#finding the number of votes for Trump/Harris proportional to total votes in each state
+merged_df['HARRIS FRAC TOTAL'] = merged_df['HARRIS']/merged_df['TOTAL VOTES'].sum()
+merged_df['TRUMP FRAC TOTAL'] = merged_df['TRUMP']/merged_df['TOTAL VOTES'].sum()
 
-    #print(f"Getting data from {url}")
-
-    #driver.get(url)
-    # workaround to get the page source after initial 429 error
-    #driver.get(url)
-    #driver.maximize_window()
-
-    # Wait for the page to load
-    from selenium.webdriver.common.by import By
-    from selenium.webdriver.support.ui import WebDriverWait
-    from selenium.webdriver.support import expected_conditions as EC
-    from selenium.common.exceptions import TimeoutException, NoSuchElementException
-
-    # Inside get_raw_trends_data:
-    """Clicks through all pagination and returns combined HTML from each page."""
-    html_pages = []
-
-    while True:
-        # Wait for page to load
-        WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.CLASS_NAME, "geo-widget-wrapper"))
-        )
-        time.sleep(1)
-
-        html_pages.append(driver.page_source)
-
-        try:
-            # Try to find and click the next page arrow
-            next_btn = driver.find_element(By.CSS_SELECTOR, "button[aria-label='Next']")
-            if next_btn.is_enabled():
-                next_btn.click()
-            else:
-                break
-        except NoSuchElementException:
-            break
-        except TimeoutException:
-            break
-
-    return html_pages
-
-
-# Add import
-from bs4 import BeautifulSoup
-
-def extract_interest_by_sub_region(content: str) -> dict:
-    soup = BeautifulSoup(content, "html.parser")
-
-    interest_by_subregion = soup.find("div", class_="geo-widget-wrapper geo-resolution-subregion")
-    if interest_by_subregion is None:
-        print("❌ Could not find interest_by_subregion container.")
-        return {}
-
-    related_queries = interest_by_subregion.find_all("div", class_="fe-atoms-generic-content-container")
-
-    # Dictionary to store the extracted data
-    interest_data = {}
-
-    # Extract the region name and interest percentage
-    for query in related_queries:
-        items = query.find_all("div", class_="item")
-        for item in items:
-            region = item.find("div", class_="label-text")
-            interest = item.find("div", class_="progress-value")
-            if region and interest:
-                interest_data[region.text.strip()] = interest.text.strip()
-
-    return interest_data
-
-# Parameters
-date_range = "now 7-d"
-geo = "US"
-query = "zombies"
-
-# Construct the URL
-url = f"https://trends.google.com/trends/explore?date={date_range}&geo={geo}&q={query}"
-
-driver = get_driver()
-
-driver.get(url)
-all_html = get_all_pages_html(driver)
-
-interest_data = {}
-for page_html in all_html:
-    page_data = extract_interest_by_sub_region(page_html)
-    interest_data.update(page_data)  # Merge dictionaries
-
-
-# Print the extracted data
-for region, interest in interest_data.items():
-    print(f"{region}: {interest}")
+#correlation of Harris votes with 'zombies' searches
+correlation = merged_df['HARRIS FRAC TOTAL'].corr(merged_df['zombies'])
+print(correlation)
