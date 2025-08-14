@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Formatted Page</title>
+</head>
+<body>
+    <h1>Find the correlation between votes for Harris or Trump from the 2024 election.</h1>
+        <div class="section">
+            <h3>1. Google Trends Data (Zombies Interest)</h3>
+            <p>In a real implementation, this would fetch from SerpApi. For now, using sample data:</p>
+            <button class="sample-data-btn" onclick="exampleButtonClick()">Find Correlation</button>
+            <div id="trends-data"></div>
+        </div>
+    <!--input type="text" id="username" name="username" placeholder="Enter your search term: "--> 
+</body>
+
+  <pre id="output"></pre>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/12.4.0/math.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+    <script>
+        //global variables so that the function can call on them later 
+        let zombies = [];
+        let harrisVotes = [];
+
+        //loads merged_df (created from python file) - hardcoded as this data includes all vote information 
+        Promise.all([
+            loadCSV('merged_df.csv'),
+        ])
+        .then(([mergedDataTable]) => {
+            console.log("Parsed data:", mergedDataTable[0]);
+
+            //creating variables to later call on rows from merged_df
+            zombies = mergedDataTable.map(row => Number(row.zombies));
+            harrisVotes = mergedDataTable.map(row => Number(row["HARRIS FRAC TOTAL"]));
+            trumpVotes = mergedDataTable.map(row => Number(row["TRUMP FRAC TOTAL"]));
+
+            //for debugging
+            console.log("Zombies:", zombies);
+            console.log("Harris Votes:", harrisVotes);
+            console.log("Trump Votes:", harrisVotes);
+
+        })
+
+        .catch(error => {
+        document.getElementById('output').textContent = 'Error loading CSVs.';
+        console.error(error);
+        });
+
+    function findCorrelation(A, B){
+        return math.corr(A, B);
+    }
+    
+    //sample function with hard coded zombie and voting data - will be altered later so that you can look up any search term
+    function exampleButtonClick() {
+        if (zombies.length === 0 || harrisVotes.length === 0) {
+        document.getElementById('output').textContent = 'Data not loaded yet.';
+        return;
+      }
+
+    //displays correlations
+      const D_result = findCorrelation(zombies, harrisVotes);
+      const R_result = findCorrelation(zombies, trumpVotes);
+
+    document.getElementById('output').textContent = 
+        `Correlation between Zombies Interest and Harris Vote Share: ${D_result.toFixed(4)}\n` +
+        `Correlation between Zombies Interest and Trump Vote Share: ${R_result.toFixed(4)}\n`;
+    }
+
+    //uses Papa.parse to load in merged_df.csv
+    function loadCSV(url) {
+      return fetch(url)
+        .then(response => response.text())
+        .then(csv => {
+          const parsed = Papa.parse(csv, { 
+            header: true,
+            skipEmptyLines: true
+        });
+          return parsed.data;
+        });
+    }
+    
+    </script>
+</html>

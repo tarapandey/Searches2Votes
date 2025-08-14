@@ -25,8 +25,8 @@ data = {
 df = pd.DataFrame.from_dict(data, orient="index", columns=["zombies"])
 df.index.name = "geoName"
 
-election_data = pd.read_excel('~Downloads/2024presgeresults.xlsx')
-state_codes = pd.read_csv('~Downloads/data-map-state-abbreviations - data-map-state-abbreviations.csv')
+election_data = pd.read_excel('election_results')
+state_codes = pd.read_csv('map_data.csv')
 election_data = election_data[:51]
 
 #creating merged_df that includes the vote counts
